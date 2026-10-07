@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # ShopSphere Jenkins CI/CD Controller
+  # ==========================================
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: shopsphere-jenkins
+    restart: unless-stopped
+    ports:
+      - "${JENKINS_PORT:-8080}:8080"         # Jenkins Web UI
+      - "${JENKINS_AGENT_PORT:-50000}:50000" # Jenkins Inbound Agent
+    environment:
+      - JENKINS_OPTS=--prefix=
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc.yaml
+      - JENKINS_ADMIN_USER=${JENKINS_ADMIN_USER:-admin}
+      - JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-admin}
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./jenkins/casc.yaml:/var/jenkins_home/casc.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/workspace:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/login || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shopsphere-net
+
+  # ==========================================
+  # ShopSphere Backend API Service
+  # ==========================================
+  backend:
+    build:
+      context: ./app/backend
+      dockerfile: Dockerfile
+    container_name: shopsphere-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    environment:
+      - PORT=5000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - APP_VERSION=${APP_VERSION:-1.0.0}
+      - DEFAULT_CURRENCY=${DEFAULT_CURRENCY:-USD}
+      - ENABLE_DISCOUNTS=${ENABLE_DISCOUNTS:-true}
+      - DATABASE_URL=${DATABASE_URL:-postgres://shopsphere:secretpass123@postgres:5432/shopsphere_db}
+      - REDIS_HOST=${REDIS_HOST:-redis:6379}
+      - JWT_SECRET=${JWT_SECRET:-local_development_secret_32bytes_min}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - shopsphere-net
+
+  # ==========================================
+  # ShopSphere Frontend SPA (Nginx)
+  # ==========================================
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+    container_name: shopsphere-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8085}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    networks:
+      - shopsphere-net
+
+  # ==========================================
+  # PostgreSQL Relational Database
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: shopsphere-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shopsphere}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secretpass123}
+      POSTGRES_DB: ${POSTGRES_DB:-shopsphere_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shopsphere} -d ${POSTGRES_DB:-shopsphere_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shopsphere-net
+
+  # ==========================================
+  # Redis In-Memory Cache
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: shopsphere-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - shopsphere-net
+
+networks:
+  shopsphere-net:
+    driver: bridge
+
+volumes:
+  jenkins_home:
+  postgres_data:
+  redis_data:
