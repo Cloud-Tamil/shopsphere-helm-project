@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopSphere - Cloud Native E-Commerce</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container header-container">
+      <div class="brand">
+        <div class="logo-icon">🛍️</div>
+        <div>
+          <span class="brand-title">ShopSphere</span>
+          <span class="badge" id="env-badge">Kubernetes • Production</span>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Search products, brands, gear..." />
+        <button id="search-btn">Search</button>
+      </div>
+
+      <div class="header-actions">
+        <div class="status-indicator" id="api-status">
+          <span class="dot"></span>
+          <span class="status-text">Connecting...</span>
+        </div>
+        <button class="cart-btn" id="cart-btn" aria-label="Open Cart">
+          <span>🛒 Cart</span>
+          <span class="cart-count" id="cart-count">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner -->
+  <section class="hero-banner">
+    <div class="container hero-content">
+      <div class="hero-text">
+        <span class="tag">🚀 Microservices Architecture</span>
+        <h1>Engineered for Cloud Scale & Reliability</h1>
+        <p>Containerized with Docker • Orchestrated via Helm • Deployed with ArgoCD & Kubernetes</p>
+        <div class="hero-stats">
+          <div class="stat"><span class="stat-num" id="stat-latency">12ms</span><span class="stat-label">API Latency</span></div>
+          <div class="stat"><span class="stat-num" id="stat-pods">3 Replicas</span><span class="stat-label">HPA Active</span></div>
+          <div class="stat"><span class="stat-num" id="stat-uptime">99.99%</span><span class="stat-label">Availability</span></div>
+        </div>
+      </div>
+      <div class="hero-card">
+        <h3>Cluster Config Snapshot</h3>
+        <div class="config-row"><span>Namespace:</span> <strong id="cfg-ns">shopsphere-prod</strong></div>
+        <div class="config-row"><span>Ingress Route:</span> <strong id="cfg-ingress">/api/* → Backend:5000</strong></div>
+        <div class="config-row"><span>Release Version:</span> <strong id="cfg-version">v1.0.0</strong></div>
+        <div class="config-row"><span>Health Check:</span> <strong class="text-success" id="cfg-health">GET /healthz [200 OK]</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="container main-content">
+    <!-- Category Filter Bar -->
+    <div class="filter-bar">
+      <div class="category-tabs" id="category-tabs">
+        <button class="tab-btn active" data-category="all">All Items</button>
+        <button class="tab-btn" data-category="electronics">Electronics</button>
+        <button class="tab-btn" data-category="apparel">Apparel & Gear</button>
+        <button class="tab-btn" data-category="home">Home & Office</button>
+        <button class="tab-btn" data-category="cloud">DevOps Merch</button>
+      </div>
+      <div class="sort-selector">
+        <label for="sort-select">Sort by:</label>
+        <select id="sort-select">
+          <option value="featured">Featured</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="rating">Top Rated</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="products-grid" id="products-grid">
+      <!-- Injected by JavaScript -->
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading catalog from backend microservice...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Cart Drawer / Modal -->
+  <div class="cart-overlay" id="cart-overlay">
+    <div class="cart-drawer">
+      <div class="cart-header">
+        <h2>Your Shopping Cart</h2>
+        <button class="close-btn" id="close-cart-btn">&times;</button>
+      </div>
+      <div class="cart-items" id="cart-items">
+        <p class="empty-cart">Your cart is empty. Add items from the catalog!</p>
+      </div>
+      <div class="cart-footer">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="cart-subtotal">$0.00</span>
+        </div>
+        <div class="summary-row">
+          <span>Kubernetes Service Tax</span>
+          <span>$0.00</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total</span>
+          <span id="cart-total">$0.00</span>
+        </div>
+        <button class="checkout-btn" id="checkout-btn">Proceed to Checkout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <footer class="footer">
+    <div class="container footer-content">
+      <p>© 2026 ShopSphere Platform. Built with Helm, Docker, Kubernetes, & ArgoCD.</p>
+      <div class="footer-links">
+        <a href="#swagger" onclick="alert('Open /api/health or Swagger in documentation view'); return false;">API Health</a>
+        <a href="#helm">Helm Chart Specs</a>
+        <a href="#gitops">ArgoCD App</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Embedded frontend controller to interact with the backend API
+    const API_BASE = window.location.port === '3000' ? '/api' : '/api';
+    let products = [];
+    let cart = [];
+
+    async function checkApiHealth() {
+      const statusPill = document.getElementById('api-status');
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        if (res.ok) {
+          const data = await res.json();
+          statusPill.className = 'status-indicator online';
+          statusPill.querySelector('.status-text').textContent = `API Connected (${data.status})`;
+          if (data.version) document.getElementById('cfg-version').textContent = data.version;
+          if (data.environment) document.getElementById('env-badge').textContent = `K8s • ${data.environment.toUpperCase()}`;
+        } else {
+          throw new Error('API degraded');
+        }
+      } catch (err) {
+        statusPill.className = 'status-indicator offline';
+        statusPill.querySelector('.status-text').textContent = 'API Offline (Fallback Mock)';
+        // Load fallback products if backend is not currently running standalone
+        loadFallbackProducts();
+      }
+    }
+
+    async function loadProducts() {
+      try {
+        const res = await fetch(`${API_BASE}/products`);
+        if (!res.ok) throw new Error('Network error');
+        products = await res.json();
+        renderProducts(products);
+      } catch (e) {
+        loadFallbackProducts();
+      }
+    }
+
+    function loadFallbackProducts() {
+      products = [
+        { id: 1, name: "Cloud Kubernetes Hoodie", category: "cloud", price: 59.99, rating: 4.9, image: "🧥", desc: "Ultra-comfy cotton fleece with embroidered K8s steering wheel." },
+        { id: 2, name: "Helm Chart Master Desk Mat", category: "home", price: 29.50, rating: 4.8, image: "⌨️", desc: "Anti-slip stitched edge mat with Helm CLI cheat sheet diagrams." },
+        { id: 3, name: "Noise-Cancelling Dev Headphones", category: "electronics", price: 189.00, rating: 4.9, image: "🎧", desc: "40dB active noise cancellation with 35h battery life for deep focus." },
+        { id: 4, name: "Mechanical Docker Keyboard", category: "electronics", price: 129.99, rating: 4.7, image: "🐳", desc: "Hot-swappable tactile switches with RGB container backlight." },
+        { id: 5, name: "GitOps Continuous Delivery Mug", category: "cloud", price: 18.00, rating: 4.6, image: "☕", desc: "Heat-reactive ceramic that reveals ArgoCD sync status when warm." },
+        { id: 6, name: "Ergonomic Mesh Task Chair", category: "home", price: 349.00, rating: 4.9, image: "🪑", desc: "Lumbar support designed for engineers deploying multi-cluster workloads." }
+      ];
+      renderProducts(products);
+    }
+
+    function renderProducts(list) {
+      const grid = document.getElementById('products-grid');
+      if (!list || list.length === 0) {
+        grid.innerHTML = '<div class="no-items">No products found matching your search.</div>';
+        return;
+      }
+      grid.innerHTML = list.map(p => `
+        <div class="product-card">
+          <div class="product-badge">${p.category.toUpperCase()}</div>
+          <div class="product-img-wrapper">${p.image || '📦'}</div>
+          <div class="product-info">
+            <div class="product-rating">★ ${p.rating || 4.8} / 5.0</div>
+            <h3 class="product-title">${p.name}</h3>
+            <p class="product-desc">${p.desc || ''}</p>
+            <div class="product-bottom">
+              <span class="product-price">$${Number(p.price).toFixed(2)}</span>
+              <button class="add-to-cart-btn" onclick="addToCart(${p.id})">Add to Cart</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addToCart(id) {
+      const prod = products.find(p => p.id === id);
+      if (!prod) return;
+      const existing = cart.find(item => item.id === id);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ ...prod, qty: 1 });
+      }
+      updateCartUI();
+      showToast(`Added "${prod.name}" to cart`);
+    }
+
+    function updateCartUI() {
+      const countEl = document.getElementById('cart-count');
+      const itemsEl = document.getElementById('cart-items');
+      const totalEl = document.getElementById('cart-total');
+      const subtotalEl = document.getElementById('cart-subtotal');
+
+      const totalItems = cart.reduce((acc, i) => acc + i.qty, 0);
+      countEl.textContent = totalItems;
+
+      if (cart.length === 0) {
+        itemsEl.innerHTML = '<p class="empty-cart">Your cart is empty. Add items from the catalog!</p>';
+        subtotalEl.textContent = '$0.00';
+        totalEl.textContent = '$0.00';
+        return;
+      }
+
+      const total = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+      subtotalEl.textContent = `$${total.toFixed(2)}`;
+      totalEl.textContent = `$${total.toFixed(2)}`;
+
+      itemsEl.innerHTML = cart.map(i => `
+        <div class="cart-item">
+          <div class="cart-item-icon">${i.image || '📦'}</div>
+          <div class="cart-item-details">
+            <h4>${i.name}</h4>
+            <div class="cart-item-price">$${i.price.toFixed(2)} x ${i.qty}</div>
+          </div>
+          <div class="cart-item-actions">
+            <button onclick="changeQty(${i.id}, -1)">-</button>
+            <span>${i.qty}</span>
+            <button onclick="changeQty(${i.id}, 1)">+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function changeQty(id, delta) {
+      const item = cart.find(i => i.id === id);
+      if (!item) return;
+      item.qty += delta;
+      if (item.qty <= 0) {
+        cart = cart.filter(i => i.id !== id);
+      }
+      updateCartUI();
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+
+    // Event Listeners
+    document.getElementById('cart-btn').addEventListener('click', () => {
+      document.getElementById('cart-overlay').classList.add('open');
+    });
+    document.getElementById('close-cart-btn').addEventListener('click', () => {
+      document.getElementById('cart-overlay').classList.remove('open');
+    });
+    document.getElementById('checkout-btn').addEventListener('click', async () => {
+      if (cart.length === 0) {
+        showToast('Cart is empty!');
+        return;
+      }
+      showToast('Processing order with backend microservice...');
+      try {
+        const res = await fetch(`${API_BASE}/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: cart, customer: "devops-engineer@shopsphere.io" })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          alert(`Order placed successfully!\nOrder ID: ${data.orderId || 'ORD-9823'}\nTotal: $${data.total || '0.00'}`);
+          cart = [];
+          updateCartUI();
+          document.getElementById('cart-overlay').classList.remove('open');
+        } else {
+          throw new Error('Order creation error');
+        }
+      } catch (e) {
+        alert('Order simulated successfully in local mode! Total: ' + document.getElementById('cart-total').textContent);
+        cart = [];
+        updateCartUI();
+        document.getElementById('cart-overlay').classList.remove('open');
+      }
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const cat = btn.dataset.category;
+        if (cat === 'all') {
+          renderProducts(products);
+        } else {
+          renderProducts(products.filter(p => p.category === cat));
+        }
+      });
+    });
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      renderProducts(products.filter(p => p.name.toLowerCase().includes(term) || (p.desc && p.desc.toLowerCase().includes(term))));
+    });
+
+    // Init
+    checkApiHealth();
+    loadProducts();
+  </script>
+</body>
+</html>
