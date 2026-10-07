@@ -1,0 +1,11 @@
+configuration-as-code:latest
+git:latest
+workflow-aggregator:latest
+pipeline-stage-view:latest
+docker-workflow:latest
+credentials-binding:latest
+timestamper:latest
+ansicolor:latest
+job-dsl:latest
+ws-cleanup:latest
+pipeline-graph-view:latest
