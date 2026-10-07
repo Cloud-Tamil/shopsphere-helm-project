@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shopsphere-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    environment: prod
+    app: shopsphere
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/your-org/shopsphere-helm-project.git'
+    targetRevision: main
+    path: helm/shopsphere
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: shopsphere-prod
+  syncPolicy:
+    # Production allows automated sync with prune and strict verification
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
