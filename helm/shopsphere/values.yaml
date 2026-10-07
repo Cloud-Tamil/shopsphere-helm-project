@@ -1,0 +1,130 @@
+# ==========================================
+# ShopSphere Default Helm Values (Base)
+# ==========================================
+
+global:
+  environment: "development"
+  domain: "shopsphere.local"
+
+# Frontend Service Configuration (Nginx SPA)
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: shopsphere/frontend
+    pullPolicy: IfNotPresent
+    tag: "1.0.0"
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+  probes:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 10
+      periodSeconds: 15
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
+# Backend Service Configuration (Node.js REST API)
+backend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: shopsphere/backend
+    pullPolicy: IfNotPresent
+    tag: "1.0.0"
+  service:
+    type: ClusterIP
+    port: 5000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 80
+  probes:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 15
+      periodSeconds: 20
+    readiness:
+      path: /readyz
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
+# Ingress Configuration (NGINX Ingress Controller)
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: shopsphere.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls: []
+
+# Configuration Variables (ConfigMap)
+config:
+  logLevel: "info"
+  port: "5000"
+  currency: "USD"
+  enableDiscounts: "true"
+  cacheTtlSeconds: "300"
+
+# Sensitive Credentials (Kubernetes Secret)
+secrets:
+  databaseUrl: "postgres://shopsphere_user:vault_pass_123@postgres-service:5432/shopsphere_db"
+  jwtSecret: "change_me_super_secure_jwt_secret_token"
+  paymentGatewayKey: "pk_test_shopsphere_fake_gateway_stripe"
+  adminApiKey: "adm_key_9942a188f"
+
+# ServiceAccount Configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "shopsphere-sa"
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

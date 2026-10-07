@@ -1,0 +1,70 @@
+# ==========================================
+# ShopSphere Helm Values - Staging / UAT
+# Pre-production replica sets and SSL test certs
+# ==========================================
+
+global:
+  environment: "staging"
+  domain: "staging.shopsphere.io"
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: "rc-1.0.0"
+  resources:
+    limits:
+      cpu: 300m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
+
+backend:
+  replicaCount: 2
+  image:
+    tag: "rc-1.0.0"
+  resources:
+    limits:
+      cpu: 600m
+      memory: 512Mi
+    requests:
+      cpu: 150m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: staging.shopsphere.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: shopsphere-staging-tls
+      hosts:
+        - staging.shopsphere.io
+
+config:
+  logLevel: "info"
+  currency: "USD"
+  enableDiscounts: "true"
+
+secrets:
+  databaseUrl: "postgres://stage_user:stage_secret@aurora-stage.internal:5432/shopsphere_staging"
+  jwtSecret: "staging_jwt_secret_token_val_4881"

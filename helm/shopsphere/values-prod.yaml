@@ -1,0 +1,95 @@
+# ==========================================
+# ShopSphere Helm Values - Production
+# High availability, HPA, TLS certificates & security hardening
+# ==========================================
+
+global:
+  environment: "production"
+  domain: "shopsphere.io"
+
+frontend:
+  replicaCount: 3
+  image:
+    repository: 123456789012.dkr.ecr.us-east-1.amazonaws.com/shopsphere/frontend
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+backend:
+  replicaCount: 3
+  image:
+    repository: 123456789012.dkr.ecr.us-east-1.amazonaws.com/shopsphere/backend
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 65
+    targetMemoryUtilizationPercentage: 75
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+  hosts:
+    - host: shopsphere.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: shopsphere-prod-tls
+      hosts:
+        - shopsphere.io
+        - www.shopsphere.io
+
+config:
+  logLevel: "warn"
+  currency: "USD"
+  enableDiscounts: "true"
+  cacheTtlSeconds: "3600"
+
+secrets:
+  databaseUrl: "postgres://prod_admin:vault_super_secret_p9@aurora-prod-cluster.internal:5432/shopsphere_prod"
+  jwtSecret: "prod_enc_256_bit_jwt_master_production_key"
+  paymentGatewayKey: "live_pk_shopsphere_stripe_real_token"
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - shopsphere
+          topologyKey: "kubernetes.io/hostname"

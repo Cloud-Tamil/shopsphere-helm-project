@@ -1,0 +1,19 @@
+apiVersion: v2
+name: shopsphere
+description: Production-grade Helm chart for ShopSphere Cloud-Native E-Commerce Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - e-commerce
+  - microservices
+  - nodejs
+  - nginx
+  - argocd
+  - kubernetes
+home: https://github.com/shopsphere/shopsphere-helm-project
+sources:
+  - https://github.com/shopsphere/shopsphere-helm-project
+maintainers:
+  - name: ShopSphere DevOps Team
+    email: devops@shopsphere.io

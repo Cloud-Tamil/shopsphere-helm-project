@@ -1,0 +1,58 @@
+# ==========================================
+# ShopSphere Helm Values - Development
+# Lightweight footprint, local ingress & debug logs
+# ==========================================
+
+global:
+  environment: "dev"
+  domain: "dev.shopsphere.local"
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: "dev-latest"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 25m
+      memory: 32Mi
+
+backend:
+  replicaCount: 1
+  image:
+    tag: "dev-latest"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: dev.shopsphere.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+
+config:
+  logLevel: "debug"
+  currency: "USD"
+  enableDiscounts: "true"
+
+secrets:
+  databaseUrl: "postgres://dev_user:dev_pass@dev-postgres:5432/shopsphere_dev"
+  jwtSecret: "dev_secret_key_not_for_prod"
